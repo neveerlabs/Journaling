@@ -1,0 +1,33 @@
+{
+  "name": "journaling",
+  "version": "1.5.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@fluentui/react-components": "^9.74.1",
+    "@fluentui/react-icons": "^2.0.329",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "date-fns": "^4.4.0",
+    "dexie": "^4.4.6",
+    "lucide-react": "^1.45.0",
+    "next": "^16.2.9",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-google-recaptcha": "^3.1.0",
+    "react-hook-form": "^7.88.0",
+    "recharts": "^3.10.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/react-google-recaptcha": "^2.1.9",
+    "typescript": "^5"
+  }
+}
