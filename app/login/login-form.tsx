@@ -88,6 +88,14 @@ export function LoginForm() {
   }, [searchParams])
 
   const handleGoogle = async () => {
+    if (!captchaToken) {
+      setMessage({
+        intent: 'error',
+        text: 'Please complete the reCAPTCHA verification first before continuing with Google.',
+      })
+      captchaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
     setLoading(true)
     setMessage(null)
     const { error } = await supabase.auth.signInWithOAuth({
@@ -155,6 +163,15 @@ export function LoginForm() {
           </MessageBar>
         )}
 
+        <div className={styles.captchaWrap} ref={captchaRef as any}>
+          <ReCAPTCHA
+            ref={captchaRef}
+            sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+            onChange={(t) => setCaptchaToken(t)}
+            onExpired={() => setCaptchaToken(null)}
+          />
+        </div>
+
         <Button
           appearance="secondary"
           onClick={handleGoogle}
@@ -208,15 +225,6 @@ export function LoginForm() {
               onChange={(_, d) => setPassword(d.value)}
             />
           </Field>
-
-          <div className={styles.captchaWrap}>
-            <ReCAPTCHA
-              ref={captchaRef}
-              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
-              onChange={(t) => setCaptchaToken(t)}
-              onExpired={() => setCaptchaToken(null)}
-            />
-          </div>
 
           <Button
             appearance="primary"
