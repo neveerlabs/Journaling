@@ -762,6 +762,7 @@ function JournalView({
   notify,
   focusEntryId,
   onFocusHandled,
+  requireLogin,
 }: {
   entries: JournalEntry[]
   projects: Project[]
@@ -769,6 +770,7 @@ function JournalView({
   notify: (message: string) => void
   focusEntryId: string | null
   onFocusHandled: () => void
+  requireLogin: () => boolean
 }) {
   const styles = useStyles()
   const [open, setOpen] = useState(false)
@@ -791,6 +793,7 @@ function JournalView({
   )
 
   const startEdit = (entry: JournalEntry) => {
+    if (!requireLogin()) return
     setEditing(entry)
     setForm({
       title: entry.title,
@@ -801,6 +804,22 @@ function JournalView({
       status: entry.status,
       blockers: entry.blockers ?? '',
       nextActions: entry.nextActions ?? '',
+    })
+    setOpen(true)
+  }
+
+  const openNew = () => {
+    if (!requireLogin()) return
+    setEditing(null)
+    setForm({
+      title: '',
+      content: '',
+      date: today(),
+      projectId: '',
+      tags: '',
+      status: 'completed',
+      blockers: '',
+      nextActions: '',
     })
     setOpen(true)
   }
@@ -817,6 +836,7 @@ function JournalView({
   }, [focusEntryId, entries])
 
   const save = async () => {
+    if (!requireLogin()) return
     if (!form.title.trim() || !form.content.trim()) {
       notify('Title and content are required.')
       return
@@ -854,6 +874,7 @@ function JournalView({
   }
 
   const remove = async (id: string) => {
+    if (!requireLogin()) return
     if (!window.confirm('Delete this journal entry? This action cannot be undone.')) return
     try {
       await withTimeout(journalRepository.delete(id))
@@ -874,14 +895,7 @@ function JournalView({
             Make your work visible to your future self and your team.
           </Body1>
         </div>
-        <Button
-          appearance="primary"
-          icon={<Add24Regular />}
-          onClick={() => {
-            setEditing(null)
-            setOpen(true)
-          }}
-        >
+        <Button appearance="primary" icon={<Add24Regular />} onClick={openNew}>
           New entry
         </Button>
       </div>
@@ -908,7 +922,7 @@ function JournalView({
             }
             action={
               !query ? (
-                <Button appearance="secondary" onClick={() => setOpen(true)}>
+                <Button appearance="secondary" onClick={openNew}>
                   Create entry
                 </Button>
               ) : undefined
@@ -1020,10 +1034,12 @@ function ProjectsView({
   projects,
   onRefresh,
   notify,
+  requireLogin,
 }: {
   projects: Project[]
   onRefresh: () => void
   notify: (message: string) => void
+  requireLogin: () => boolean
 }) {
   const styles = useStyles()
   const [open, setOpen] = useState(false)
@@ -1042,7 +1058,28 @@ function ProjectsView({
     setEditing(null)
   }
 
+  const openNew = () => {
+    if (!requireLogin()) return
+    reset()
+    setOpen(true)
+  }
+
+  const openEdit = (project: Project) => {
+    if (!requireLogin()) return
+    setEditing(project)
+    setForm({
+      name: project.name,
+      description: project.description,
+      status: project.status,
+      priority: project.priority,
+      startDate: project.startDate,
+      targetDate: project.targetDate ?? '',
+    })
+    setOpen(true)
+  }
+
   const save = async () => {
+    if (!requireLogin()) return
     if (!form.name.trim()) {
       notify('Project name is required.')
       return
@@ -1062,6 +1099,7 @@ function ProjectsView({
   }
 
   const remove = async (project: Project) => {
+    if (!requireLogin()) return
     if (!window.confirm(`Delete ${project.name}? This action cannot be undone.`)) return
     try {
       await withTimeout(projectRepository.delete(project.id))
@@ -1080,7 +1118,7 @@ function ProjectsView({
           <Title1>Projects</Title1>
           <Body1 className={styles.muted}>Keep initiatives, context, and outcomes connected.</Body1>
         </div>
-        <Button appearance="primary" icon={<Add24Regular />} onClick={() => setOpen(true)}>
+        <Button appearance="primary" icon={<Add24Regular />} onClick={openNew}>
           New project
         </Button>
       </div>
@@ -1092,7 +1130,7 @@ function ProjectsView({
             title="No projects yet"
             description="Create a project to connect entries, meetings, and decisions."
             action={
-              <Button appearance="secondary" onClick={() => setOpen(true)}>Create project</Button>
+              <Button appearance="secondary" onClick={openNew}>Create project</Button>
             }
           />
         ) : (
@@ -1112,18 +1150,7 @@ function ProjectsView({
                     appearance="subtle"
                     icon={<Edit24Regular />}
                     aria-label={`Edit ${project.name}`}
-                    onClick={() => {
-                      setEditing(project)
-                      setForm({
-                        name: project.name,
-                        description: project.description,
-                        status: project.status,
-                        priority: project.priority,
-                        startDate: project.startDate,
-                        targetDate: project.targetDate ?? '',
-                      })
-                      setOpen(true)
-                    }}
+                    onClick={() => openEdit(project)}
                   />
                   <Button
                     appearance="subtle"
@@ -1181,7 +1208,7 @@ function ProjectsView({
             <DialogActions>
               <Button appearance="secondary" onClick={() => setOpen(false)}>Cancel</Button>
               <Button appearance="primary" onClick={save} disabled={!form.name.trim()}>
-                Create project
+                {editing ? 'Save changes' : 'Create project'}
               </Button>
             </DialogActions>
           </DialogBody>
@@ -1200,6 +1227,8 @@ function CollectionView({
   onRefresh,
   notify,
   kind,
+  user,
+  requireLogin,
 }: {
   title: string
   eyebrow: string
@@ -1209,6 +1238,8 @@ function CollectionView({
   onRefresh: () => void
   notify: (message: string) => void
   kind: 'meetings' | 'decisions' | 'knowledge' | 'team'
+  user: any
+  requireLogin: () => boolean
 }) {
   const styles = useStyles()
   const [open, setOpen] = useState(false)
@@ -1227,6 +1258,10 @@ function CollectionView({
   })
 
   useEffect(() => {
+    if (!user) {
+      setItems([])
+      return
+    }
     let active = true
     const load = async () => {
       try {
@@ -1248,9 +1283,15 @@ function CollectionView({
     return () => {
       active = false
     }
-  }, [kind, count])
+  }, [kind, count, user?.id])
+
+  const openNew = () => {
+    if (!requireLogin()) return
+    setOpen(true)
+  }
 
   const save = async () => {
+    if (!requireLogin()) return
     if (!form.title.trim()) {
       notify(`${kind === 'team' ? 'Name' : 'Title'} is required.`)
       return
@@ -1318,6 +1359,7 @@ function CollectionView({
   }
 
   const remove = async (item: any) => {
+    if (!requireLogin()) return
     if (!window.confirm(`Delete ${item.title || item.name}? This action cannot be undone.`)) return
     try {
       if (kind === 'meetings') await withTimeout(meetingRepository.delete(item.id))
@@ -1339,7 +1381,7 @@ function CollectionView({
           <Title1>{title}</Title1>
           <Body1 className={styles.muted}>{description}</Body1>
         </div>
-        <Button appearance="primary" icon={<Add24Regular />} onClick={() => setOpen(true)}>
+        <Button appearance="primary" icon={<Add24Regular />} onClick={openNew}>
           New {title.slice(0, -1).toLowerCase()}
         </Button>
       </div>
@@ -1351,7 +1393,7 @@ function CollectionView({
             title={`No ${title.toLowerCase()} yet`}
             description={`Create your first ${title.slice(0, -1).toLowerCase()} to keep your workspace current.`}
             action={
-              <Button appearance="secondary" onClick={() => setOpen(true)}>Create one</Button>
+              <Button appearance="secondary" onClick={openNew}>Create one</Button>
             }
           />
         ) : (
@@ -1463,10 +1505,12 @@ function SettingsView({
   notify,
   profile,
   onProfileRefresh,
+  user,
 }: {
   notify: (message: string) => void
   profile: UserProfile | null
   onProfileRefresh: () => void
+  user: any
 }) {
   const styles = useStyles()
   const supabase = getSupabase()
@@ -1524,6 +1568,39 @@ function SettingsView({
   const handleLogout = async () => {
     await supabase.auth.signOut()
     window.location.href = '/login'
+  }
+
+  if (!user) {
+    return (
+      <>
+        <div className={styles.pageHeader}>
+          <div>
+            <div className={styles.eyebrow}>Account</div>
+            <Title1>Settings</Title1>
+            <Body1 className={styles.muted}>
+              Please sign in to manage your profile and account preferences.
+            </Body1>
+          </div>
+        </div>
+        <Card className={styles.sectionCard}>
+          <EmptyState
+            icon={<PersonCircle24Regular />}
+            title="Sign in required"
+            description="You need to be signed in to access your account settings."
+            action={
+              <Button
+                appearance="primary"
+                onClick={() => {
+                  window.location.href = '/login'
+                }}
+              >
+                Sign in
+              </Button>
+            }
+          />
+        </Card>
+      </>
+    )
   }
 
   return (
@@ -1673,7 +1750,7 @@ function SettingsView({
 export function WorkJournal() {
   const styles = useStyles()
   const menuRef = useRef<HTMLElement>(null)
-  const { user } = useUser()
+  const { user, loading: authLoading } = useUser()
   const [view, setView] = useState<View>('dashboard')
   const [menuOpen, setMenuOpen] = useState(false)
   const [entries, setEntries] = useState<JournalEntry[]>([])
@@ -1682,11 +1759,31 @@ export function WorkJournal() {
   const [notice, setNotice] = useState('')
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [focusEntryId, setFocusEntryId] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
+
+  const requireLogin = (): boolean => {
+    if (!user) {
+      setShowLoginPrompt(true)
+      return false
+    }
+    return true
+  }
+
+  const handleSetView = (nextView: View) => {
+    setView(nextView)
+  }
 
   const refresh = async () => {
+    if (!user) {
+      setEntries([])
+      setProjects([])
+      setCounts({ meetings: 0, decisions: 0, knowledge: 0, team: 0 })
+      setProfile(null)
+      return
+    }
     setLoading(true)
     try {
       const [nextEntries, nextProjects, meetings, decisions, knowledge, team, nextProfile] =
@@ -1718,6 +1815,7 @@ export function WorkJournal() {
   }
 
   const refreshProfile = async () => {
+    if (!user) return
     try {
       const p = await profileRepository.getMine()
       setProfile(p)
@@ -1725,8 +1823,7 @@ export function WorkJournal() {
   }
 
   useEffect(() => {
-    if (user) refresh()
-    else setLoading(false)
+    refresh()
   }, [user?.id])
 
   useEffect(() => {
@@ -1769,7 +1866,7 @@ export function WorkJournal() {
   const page =
     view === 'dashboard' ? (
       <Dashboard
-        setView={setView}
+        setView={handleSetView}
         entries={entries}
         projects={projects}
         meetings={Array.from({ length: counts.meetings })}
@@ -1786,9 +1883,15 @@ export function WorkJournal() {
         notify={notify}
         focusEntryId={focusEntryId}
         onFocusHandled={() => setFocusEntryId(null)}
+        requireLogin={requireLogin}
       />
     ) : view === 'projects' ? (
-      <ProjectsView projects={projects} onRefresh={refresh} notify={notify} />
+      <ProjectsView
+        projects={projects}
+        onRefresh={refresh}
+        notify={notify}
+        requireLogin={requireLogin}
+      />
     ) : view === 'meetings' ? (
       <CollectionView
         title="Meetings"
@@ -1799,6 +1902,8 @@ export function WorkJournal() {
         onRefresh={refresh}
         notify={notify}
         kind="meetings"
+        user={user}
+        requireLogin={requireLogin}
       />
     ) : view === 'decisions' ? (
       <CollectionView
@@ -1810,6 +1915,8 @@ export function WorkJournal() {
         onRefresh={refresh}
         notify={notify}
         kind="decisions"
+        user={user}
+        requireLogin={requireLogin}
       />
     ) : view === 'knowledge' ? (
       <CollectionView
@@ -1821,6 +1928,8 @@ export function WorkJournal() {
         onRefresh={refresh}
         notify={notify}
         kind="knowledge"
+        user={user}
+        requireLogin={requireLogin}
       />
     ) : view === 'team' ? (
       <CollectionView
@@ -1832,6 +1941,8 @@ export function WorkJournal() {
         onRefresh={refresh}
         notify={notify}
         kind="team"
+        user={user}
+        requireLogin={requireLogin}
       />
     ) : view === 'reports' ? (
       <>
@@ -1851,19 +1962,25 @@ export function WorkJournal() {
         </Card>
       </>
     ) : (
-      <SettingsView notify={notify} profile={profile} onProfileRefresh={refreshProfile} />
+      <SettingsView
+        notify={notify}
+        profile={profile}
+        onProfileRefresh={refreshProfile}
+        user={user}
+      />
     )
 
-  if (loading && user)
+  if (authLoading || (loading && user)) {
     return (
       <div className={styles.shell} style={{ display: 'grid', placeItems: 'center' }}>
         <Spinner label="Loading your workspace" />
       </div>
     )
+  }
 
   return (
     <div className={styles.shell} style={{ display: 'flex' }}>
-      <AppSidebar view={view} setView={setView} />
+      <AppSidebar view={view} setView={handleSetView} />
       <main className={styles.main}>
         <header className={styles.topbar}>
           <div className={styles.mobileNav} ref={menuRef}>
@@ -1967,6 +2084,39 @@ export function WorkJournal() {
           {page}
         </div>
       </main>
+
+      <Dialog
+        open={showLoginPrompt}
+        onOpenChange={(_, d) => setShowLoginPrompt(d.open)}
+      >
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>Sign in required</DialogTitle>
+            <DialogContent>
+              <Body1>
+                You need to sign in to perform this action. Would you like to sign in
+                now?
+              </Body1>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                appearance="secondary"
+                onClick={() => setShowLoginPrompt(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                appearance="primary"
+                onClick={() => {
+                  window.location.href = '/login'
+                }}
+              >
+                Sign in
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </div>
   )
 }
