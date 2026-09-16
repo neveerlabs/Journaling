@@ -29,11 +29,10 @@ export async function updateSession(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      const cleanUrl = request.nextUrl.clone()
-      cleanUrl.searchParams.delete('code')
-      cleanUrl.searchParams.delete('state')
-      cleanUrl.searchParams.delete('next')
-      const redirect = NextResponse.redirect(cleanUrl)
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      url.search = ''
+      const redirect = NextResponse.redirect(url)
       supabaseResponse.cookies.getAll().forEach((cookie) => {
         redirect.cookies.set(cookie.name, cookie.value)
       })
@@ -45,20 +44,6 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
-
-  const isAuthRoute =
-    path.startsWith('/login') ||
-    path.startsWith('/auth') ||
-    path.startsWith('/_next') ||
-    path.startsWith('/assets') ||
-    path === '/favicon.ico'
-
-  if (!user && !isAuthRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    url.search = ''
-    return NextResponse.redirect(url)
-  }
 
   if (user && path === '/login') {
     const url = request.nextUrl.clone()
